@@ -1,6 +1,6 @@
 # Go SSM Config (ssmconfig)
 
-`import "github.com/ianlopshire/ssmconfig"`
+`import "github.com/ianlopshire/go-ssm-config"`
 
 SSM Config is a utility for loading configuration values from AWS SSM (Parameter Store).
 
