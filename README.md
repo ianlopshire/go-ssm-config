@@ -1,4 +1,4 @@
-# Go SSM Config (ssmconfig)
+# ssmconfig [![GoDoc](https://godoc.org/github.com/ianlopshire/go-ssm-config?status.svg)](http://godoc.org/github.com/ianlopshire/go-ssm-config) [![Report card](https://goreportcard.com/badge/github.com/ianlopshire/go-ssm-config)](https://goreportcard.com/report/github.com/ianlopshire/go-ssm-config) [![Go Cover](http://gocover.io/_badge/github.com/ianlopshire/go-ssm-config)](http://gocover.io/github.com/ianlopshire/go-ssm-config)
 
 `import "github.com/ianlopshire/go-ssm-config"`
 
