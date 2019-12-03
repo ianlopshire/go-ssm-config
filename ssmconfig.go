@@ -1,3 +1,5 @@
+// Package ssmconfig is a utility for loading configuration values from AWS SSM (Parameter
+// Store) directly into a struct.
 package ssmconfig
 
 import (
@@ -31,17 +33,20 @@ type Provider struct {
 	SSM ssmiface.SSMAPI
 }
 
-// Process loads config values from smm (parameter store) into c.
+// Process loads config values from smm (parameter store) into c. Encrypted parameters
+// will automatically be decrypted. c must be a pointer to a struct.
 //
-// The path for each struct field is controlled by the `ssm` tag. If the `ssm` tag is
-// omitted or empty it will be ignored.
+// The `ssm` tag is used to lookup the parameter in Parameter Store. It is joined to the
+// provided base path. If the `ssm` tag is missing the struct field will be ignored.
 //
-// The field is set to the vale of the `default` tag if the path is invalid.
+// The `default` tag is used to set the default value of a parameter. The default value
+// will only be set if Parameter Store returns the parameter as invalid.
 //
-// If the `required` flag is set to `true` and the path is invalid, an error will be
-// returned.
+// The `required` tag is used to mark a parameter as required. If Parameter Store returns
+// a required parameter as invalid an error will be returned.
 //
-// c must be a pointer to a struct.
+// The behavior of using the `default` and `required` tags on the same struct field is
+// currently undefined.
 func (p *Provider) Process(configPath string, c interface{}) error {
 
 	v := reflect.ValueOf(c)
