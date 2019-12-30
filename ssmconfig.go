@@ -6,12 +6,23 @@ import (
 	"path"
 	"reflect"
 	"strconv"
-
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"github.com/pkg/errors"
+)
+
+type (
+	Provider struct {
+		SSM ssmiface.SSMAPI
+	}
+
+	fieldSpec struct {
+		name         string
+		defaultValue string
+		required     bool
+	}
 )
 
 // Process processes the config with a new default provider.
@@ -26,11 +37,6 @@ func Process(configPath string, c interface{}) error {
 
 	p := Provider{SSM: ssm.New(sess)}
 	return p.Process(configPath, c)
-}
-
-// Provider is a ssm configuration provider.
-type Provider struct {
-	SSM ssmiface.SSMAPI
 }
 
 // Process loads config values from smm (parameter store) into c. Encrypted parameters
@@ -48,59 +54,55 @@ type Provider struct {
 // The behavior of using the `default` and `required` tags on the same struct field is
 // currently undefined.
 func (p *Provider) Process(configPath string, c interface{}) error {
-
 	v := reflect.ValueOf(c)
 	if v.Kind() != reflect.Ptr || v.IsNil() {
 		return errors.New("ssmconfig: c must be a pointer to a struct")
 	}
-
 	v = reflect.Indirect(reflect.ValueOf(c))
 	if v.Kind() != reflect.Struct {
 		return errors.New("ssmconfig: c must be a pointer to a struct")
 	}
+	// get params required from struct
+	spec := make(map[string]fieldSpec)
+	buildStructSpec(configPath, v.Type(), &spec)
 
-	spec := buildStructSpec(configPath, v.Type())
-
+	// get params from ssm parameter store
 	params, invalidPrams, err := p.getParameters(spec)
 	if err != nil {
 		return errors.Wrap(err, "ssmconfig: could not get parameters")
 	}
 
-	for i, field := range spec {
-		if field.name == "" && field.defaultValue == "" {
-			continue
-		}
-
-		if _, ok := invalidPrams[field.name]; ok && field.required {
-			return errors.Errorf("ssmconfig: %s is required", invalidPrams[field.name])
-		}
-
-		value, ok := params[field.name]
-		if !ok {
-			value = field.defaultValue
-		}
-
-		if value == "" {
-			continue
-		}
-
-		err = setValue(v.Field(i), value)
-		if err != nil {
-			return errors.Wrapf(err, "ssmconfig: error setting field %s", v.Type().Field(i).Name)
-		}
-	}
-
-	return nil
+	// set values in struct
+	return setValues(v, params, invalidPrams, spec)
 }
 
-func (p *Provider) getParameters(spec structSpec) (params map[string]string, invalidParams map[string]struct{}, err error) {
-	// find all of the params that need to be requested
-	var names []*string
-	for i := range spec {
-		if spec[i].name == "" {
+func buildStructSpec(configPath string, t reflect.Type, spec *map[string]fieldSpec) {
+	for i := 0; i < t.NumField(); i++ {
+		if t.Field(i).Type.Kind() == reflect.Struct {
+			buildStructSpec(configPath, t.Field(i).Type, spec)
 			continue
 		}
-		names = append(names, &spec[i].name)
+		name := t.Field(i).Tag.Get("ssm")
+		if name == "" {
+			continue
+		}
+		specMap := *spec
+		specMap[name] = fieldSpec{
+			name:         path.Join(configPath, name),
+			defaultValue: t.Field(i).Tag.Get("default"),
+			required:     t.Field(i).Tag.Get("required") == "true",
+		}
+	}
+}
+
+func (p *Provider) getParameters(spec map[string]fieldSpec) (params map[string]string, invalidParams map[string]struct{}, err error) {
+	// find all of the params that need to be requested
+	var names []*string
+	for _, val := range spec {
+		if val.name == "" {
+			continue
+		}
+		names = append(names, &val.name)
 	}
 
 	input := &ssm.GetParametersInput{
@@ -129,7 +131,39 @@ func (p *Provider) getParameters(spec structSpec) (params map[string]string, inv
 	return params, invalidParams, nil
 }
 
-func setValue(v reflect.Value, s string) error {
+func setValues(v reflect.Value, params map[string]string, invalidParams map[string]struct{}, spec map[string]fieldSpec) error {
+	for i := 0; i < v.NumField(); i++ {
+		if v.Type().Field(i).Type.Kind() == reflect.Struct {
+			if err := setValues(v.Field(i), params, invalidParams, spec); err != nil {
+				return err
+			}
+			continue
+		}
+		name := v.Type().Field(i).Tag.Get("ssm")
+		if name == "" {
+			continue
+		}
+		field := spec[name]
+		if _, ok := invalidParams[name]; ok && field.required {
+			return errors.Errorf("ssmconfig: %s is required", invalidParams[field.name])
+		}
+
+		value, ok := params[field.name]
+		if !ok {
+			value = field.defaultValue
+		}
+		if value == "" {
+			continue
+		}
+		err := setBasicValue(v.Field(i), value)
+		if err != nil {
+			return errors.Wrapf(err, "ssmconfig: error setting field %s", v.Type().Field(i).Name)
+		}
+	}
+	return nil
+}
+
+func setBasicValue(v reflect.Value, s string) error {
 	switch v.Kind() {
 	case reflect.String:
 		v.SetString(s)
@@ -166,28 +200,4 @@ func setValue(v reflect.Value, s string) error {
 	}
 
 	return nil
-}
-
-type structSpec []fieldSpec
-
-type fieldSpec struct {
-	name         string
-	defaultValue string
-	required     bool
-}
-
-func buildStructSpec(configPath string, t reflect.Type) (spec structSpec) {
-	for i := 0; i < t.NumField(); i++ {
-		name := t.Field(i).Tag.Get("ssm")
-		if name != "" {
-			name = path.Join(configPath, name)
-		}
-
-		spec = append(spec, fieldSpec{
-			name:         name,
-			defaultValue: t.Field(i).Tag.Get("default"),
-			required:     t.Field(i).Tag.Get("required") == "true",
-		})
-	}
-	return spec
 }
