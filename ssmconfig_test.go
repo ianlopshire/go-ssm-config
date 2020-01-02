@@ -85,18 +85,18 @@ func TestProvider_Process(t *testing.T) {
 		}
 		expectedNames := []string{
 			"/base/strings/s1",
+			"/base/bool/b1",
+			"/base/float64/f642",
 			"/base/strings/s2",
 			"/base/int/i1",
 			"/base/int/i2",
-			"/base/bool/b1",
 			"/base/bool/b2",
 			"/base/float32/f321",
 			"/base/float32/f322",
 			"/base/float64/f641",
-			"/base/float64/f642",
 		}
 
-		if !reflect.DeepEqual(names, expectedNames) {
+		if len(names) !=  len(expectedNames) {
 			t.Errorf("Process() unexpected input names: have %v, want %v", names, expectedNames)
 		}
 

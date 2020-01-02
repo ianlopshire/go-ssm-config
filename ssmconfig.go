@@ -98,11 +98,12 @@ func buildStructSpec(configPath string, t reflect.Type, spec *map[string]fieldSp
 func (p *Provider) getParameters(spec map[string]fieldSpec) (params map[string]string, invalidParams map[string]struct{}, err error) {
 	// find all of the params that need to be requested
 	var names []*string
-	for _, val := range spec {
+	for key, val := range spec {
 		if val.name == "" {
 			continue
 		}
-		names = append(names, &val.name)
+		curr := spec[key]
+		names = append(names, &curr.name)
 	}
 
 	input := &ssm.GetParametersInput{
@@ -144,7 +145,7 @@ func setValues(v reflect.Value, params map[string]string, invalidParams map[stri
 			continue
 		}
 		field := spec[name]
-		if _, ok := invalidParams[name]; ok && field.required {
+		if _, ok := invalidParams[field.name]; ok && field.required {
 			return errors.Errorf("ssmconfig: %s is required", invalidParams[field.name])
 		}
 
