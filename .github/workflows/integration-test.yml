@@ -1,0 +1,23 @@
+name: Integraton Test
+on: pull_request
+jobs:
+  test:
+    name: Go test -integration ${{ matrix.go }}
+    runs-on: ubuntu-16.04
+    strategy:
+      matrix:
+        go: ['1.13']
+    steps:
+      - uses: actions/checkout@master
+      - name: Setup go
+        uses: actions/setup-go@v1
+        with:
+          go-version: ${{ matrix.go }}
+      - name: go get & test
+        env:
+          AWS_REGION: us-east-1
+          AWS_ACCESS_KEY_ID: AKIA4TRYZB77QLS2WZ57
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        run: |
+          go get -v -t -d ./...
+          go test -v -integration ./...
