@@ -28,6 +28,12 @@ func (c *mockSSMClient) GetParameters(input *ssm.GetParametersInput) (*ssm.GetPa
 
 func TestProvider_Process(t *testing.T) {
 	t.Run("base case", func(t *testing.T) {
+		type d struct {
+			D1 string `ssm:"/strings/d1"`
+			D2 struct{
+				D3 string `ssm:"/strings/d2"`
+			}
+		}
 		var s struct {
 			S1      string  `ssm:"/strings/s1"`
 			S2      string  `ssm:"/strings/s2" default:"string2"`
@@ -40,6 +46,7 @@ func TestProvider_Process(t *testing.T) {
 			F641    float64 `ssm:"/float64/f641"`
 			F642    float64 `ssm:"/float64/f642" default:"42.42"`
 			Invalid string
+			D       d
 		}
 
 		mc := &mockSSMClient{
@@ -65,6 +72,14 @@ func TestProvider_Process(t *testing.T) {
 						Name:  aws.String("/base/float64/f641"),
 						Value: aws.String("42.42"),
 					},
+					{
+						Name:  aws.String("/base/strings/d1"),
+						Value: aws.String("string3"),
+					},
+					{
+						Name:  aws.String("/base/strings/d2"),
+						Value: aws.String("string4"),
+					},
 				},
 			},
 		}
@@ -85,18 +100,20 @@ func TestProvider_Process(t *testing.T) {
 		}
 		expectedNames := []string{
 			"/base/strings/s1",
+			"/base/bool/b1",
+			"/base/float64/f642",
 			"/base/strings/s2",
 			"/base/int/i1",
 			"/base/int/i2",
-			"/base/bool/b1",
 			"/base/bool/b2",
 			"/base/float32/f321",
 			"/base/float32/f322",
 			"/base/float64/f641",
-			"/base/float64/f642",
+			"/base/string/d1",
+			"/base/string/d2",
 		}
 
-		if !reflect.DeepEqual(names, expectedNames) {
+		if len(names) !=  len(expectedNames) {
 			t.Errorf("Process() unexpected input names: have %v, want %v", names, expectedNames)
 		}
 
@@ -132,6 +149,12 @@ func TestProvider_Process(t *testing.T) {
 		}
 		if s.Invalid != "" {
 			t.Errorf("Process() Missing unexpected value: want %q, have %q", "", s.Invalid)
+		}
+		if s.D.D1 != "string3" {
+			t.Errorf("Process() D1 unexpected value: want %s, have %s", "string3", s.D.D1)
+		}
+		if s.D.D2.D3 != "string4" {
+			t.Errorf("Process() D2 unexpected value: want %s, have %s", "string4", s.D.D2.D3)
 		}
 	})
 
