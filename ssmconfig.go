@@ -72,7 +72,7 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 		}
 
 		if _, ok := invalidPrams[field.name]; ok && field.required {
-			return errors.Errorf("ssmconfig: %s is required", invalidPrams[field.name])
+			return errors.Errorf("ssmconfig: %s is required", field.name)
 		}
 
 		value, ok := params[field.name]
