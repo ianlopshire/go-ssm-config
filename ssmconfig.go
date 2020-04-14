@@ -142,6 +142,7 @@ func (p *Provider) getParameters(spec structSpec) (params map[string]string, inv
 	return params, invalidParams, nil
 }
 
+// Checks whether the value implements the TextUnmarshaler interface.
 func isTextUnmarshaler(f reflect.StructField) bool {
 	return reflect.PtrTo(f.Type).Implements(textUnmarshalerType)
 }
