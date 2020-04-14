@@ -1,6 +1,7 @@
 package ssmconfig_test
 
 import (
+	"encoding/hex"
 	"errors"
 	"reflect"
 	"testing"
@@ -16,6 +17,20 @@ type mockSSMClient struct {
 	calledWithInput *ssm.GetParametersInput
 	output          *ssm.GetParametersOutput
 	err             error
+}
+
+type Hex struct {
+	V string
+}
+
+func (h *Hex) UnmarshalText(val []byte) error {
+	dst := make([]byte, hex.DecodedLen(len(val)))
+	n, err := hex.Decode(dst, val)
+	if err != nil {
+		return err
+	}
+	h.V = string(dst[:n])
+	return nil
 }
 
 func (c *mockSSMClient) GetParameters(input *ssm.GetParametersInput) (*ssm.GetParametersOutput, error) {
@@ -39,6 +54,8 @@ func TestProvider_Process(t *testing.T) {
 			F322    float32 `ssm:"/float32/f322" default:"42.42"`
 			F641    float64 `ssm:"/float64/f641"`
 			F642    float64 `ssm:"/float64/f642" default:"42.42"`
+			H1      *Hex    `ssm:"/hex/hex1"`
+			H2      *Hex    `ssm:"/hex/hex2" default:"737472696e6731"`
 			Invalid string
 		}
 
@@ -64,6 +81,10 @@ func TestProvider_Process(t *testing.T) {
 					{
 						Name:  aws.String("/base/float64/f641"),
 						Value: aws.String("42.42"),
+					},
+					{
+						Name:  aws.String("/base/hex/hex1"),
+						Value: aws.String("737472696e6731"),
 					},
 				},
 			},
@@ -94,6 +115,8 @@ func TestProvider_Process(t *testing.T) {
 			"/base/float32/f322",
 			"/base/float64/f641",
 			"/base/float64/f642",
+			"/base/hex/hex1",
+			"/base/hex/hex2",
 		}
 
 		if !reflect.DeepEqual(names, expectedNames) {
@@ -129,6 +152,12 @@ func TestProvider_Process(t *testing.T) {
 		}
 		if s.F642 != 42.42 {
 			t.Errorf("Process() F642 unexpected value: want %f, have %f", 42.42, s.F642)
+		}
+		if s.H1.V != "string1" {
+			t.Errorf("Process() H1 unexpected value: want %s, have %s", "string1", s.H1.V)
+		}
+		if s.H2.V != "string1" {
+			t.Errorf("Process() H2 unexpected value: want %s, have %s", "string1", s.H2.V)
 		}
 		if s.Invalid != "" {
 			t.Errorf("Process() Missing unexpected value: want %q, have %q", "", s.Invalid)

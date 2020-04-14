@@ -3,6 +3,7 @@
 package ssmconfig
 
 import (
+	"encoding"
 	"path"
 	"reflect"
 	"strconv"
@@ -84,7 +85,13 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 			continue
 		}
 
-		err = setValue(v.Field(i), value)
+		field := v.Field(i)
+		var err error
+		if isTextUnmarshaler(field) {
+			err = unmarshalText(field, value)
+		} else {
+			err = setValue(v.Field(i), value)
+		}
 		if err != nil {
 			return errors.Wrapf(err, "ssmconfig: error setting field %s", v.Type().Field(i).Name)
 		}
@@ -127,6 +134,23 @@ func (p *Provider) getParameters(spec structSpec) (params map[string]string, inv
 		invalidParams[*output.InvalidParameters[i]] = struct{}{}
 	}
 	return params, invalidParams, nil
+}
+
+func isTextUnmarshaler(v reflect.Value) bool {
+	tu := reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+	return v.Type().Implements(tu)
+}
+
+func unmarshalText(v reflect.Value, s string) error {
+	m := v.MethodByName("UnmarshalText")
+	v.Set(reflect.New(v.Type().Elem()))
+	res := m.Call([]reflect.Value{reflect.ValueOf([]byte(s))})
+	if len(res) != 1 || !res[0].IsNil() {
+		return errors.Errorf("could not decode %q into type %v: %v", s,
+			v.Type().String(), res[0].Elem().Interface().(error))
+	}
+	return nil
+
 }
 
 func setValue(v reflect.Value, s string) error {
