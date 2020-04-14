@@ -60,7 +60,8 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 		return errors.New("ssmconfig: c must be a pointer to a struct")
 	}
 
-	spec := buildStructSpec(configPath, v.Type())
+	t := v.Type()
+	spec := buildStructSpec(configPath, t)
 
 	params, invalidPrams, err := p.getParameters(spec)
 	if err != nil {
@@ -86,11 +87,12 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 		}
 
 		field := v.Field(i)
+		structField := t.Field(i)
 		var err error
-		if isTextUnmarshaler(field) {
-			err = unmarshalText(field, value)
+		if isTextUnmarshaler(structField) {
+			err = unmarshalText(structField, field, value)
 		} else {
-			err = setValue(v.Field(i), value)
+			err = setValue(field, value)
 		}
 		if err != nil {
 			return errors.Wrapf(err, "ssmconfig: error setting field %s", v.Type().Field(i).Name)
@@ -136,21 +138,26 @@ func (p *Provider) getParameters(spec structSpec) (params map[string]string, inv
 	return params, invalidParams, nil
 }
 
-func isTextUnmarshaler(v reflect.Value) bool {
+func isTextUnmarshaler(f reflect.StructField) bool {
 	tu := reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
-	return v.Type().Implements(tu)
+	return reflect.PtrTo(f.Type).Implements(tu)
 }
 
-func unmarshalText(v reflect.Value, s string) error {
-	m := v.MethodByName("UnmarshalText")
-	v.Set(reflect.New(v.Type().Elem()))
-	res := m.Call([]reflect.Value{reflect.ValueOf([]byte(s))})
-	if len(res) != 1 || !res[0].IsNil() {
-		return errors.Errorf("could not decode %q into type %v: %v", s,
-			v.Type().String(), res[0].Elem().Interface().(error))
-	}
-	return nil
+func unmarshalText(f reflect.StructField, v reflect.Value, s string) error {
+	newV := reflect.New(f.Type)
 
+	m := newV.MethodByName("UnmarshalText")
+	args := []reflect.Value{reflect.ValueOf([]byte(s))}
+	res := m.Call(args)
+
+	if len(res) != 1 || !res[0].IsNil() {
+		err := res[0].Elem().Interface().(error)
+		return errors.Errorf("could not decode %q into type %v: %v", s, f.Type.String(), err)
+	}
+
+	v.Set(newV.Elem())
+
+	return nil
 }
 
 func setValue(v reflect.Value, s string) error {

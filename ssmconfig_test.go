@@ -1,10 +1,10 @@
 package ssmconfig_test
 
 import (
-	"encoding/hex"
 	"errors"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/ssm"
@@ -19,20 +19,6 @@ type mockSSMClient struct {
 	err             error
 }
 
-type Hex struct {
-	V string
-}
-
-func (h *Hex) UnmarshalText(val []byte) error {
-	dst := make([]byte, hex.DecodedLen(len(val)))
-	n, err := hex.Decode(dst, val)
-	if err != nil {
-		return err
-	}
-	h.V = string(dst[:n])
-	return nil
-}
-
 func (c *mockSSMClient) GetParameters(input *ssm.GetParametersInput) (*ssm.GetParametersOutput, error) {
 	c.calledWithInput = input
 	if c.err != nil {
@@ -44,18 +30,18 @@ func (c *mockSSMClient) GetParameters(input *ssm.GetParametersInput) (*ssm.GetPa
 func TestProvider_Process(t *testing.T) {
 	t.Run("base case", func(t *testing.T) {
 		var s struct {
-			S1      string  `ssm:"/strings/s1"`
-			S2      string  `ssm:"/strings/s2" default:"string2"`
-			I1      int     `ssm:"/int/i1"`
-			I2      int     `ssm:"/int/i2" default:"42"`
-			B1      bool    `ssm:"/bool/b1"`
-			B2      bool    `ssm:"/bool/b2" default:"false"`
-			F321    float32 `ssm:"/float32/f321"`
-			F322    float32 `ssm:"/float32/f322" default:"42.42"`
-			F641    float64 `ssm:"/float64/f641"`
-			F642    float64 `ssm:"/float64/f642" default:"42.42"`
-			H1      *Hex    `ssm:"/hex/hex1"`
-			H2      *Hex    `ssm:"/hex/hex2" default:"737472696e6731"`
+			S1      string    `ssm:"/strings/s1"`
+			S2      string    `ssm:"/strings/s2" default:"string2"`
+			I1      int       `ssm:"/int/i1"`
+			I2      int       `ssm:"/int/i2" default:"42"`
+			B1      bool      `ssm:"/bool/b1"`
+			B2      bool      `ssm:"/bool/b2" default:"false"`
+			F321    float32   `ssm:"/float32/f321"`
+			F322    float32   `ssm:"/float32/f322" default:"42.42"`
+			F641    float64   `ssm:"/float64/f641"`
+			F642    float64   `ssm:"/float64/f642" default:"42.42"`
+			TU1     time.Time `ssm:"/text_unmarshaler/time1"`
+			TU2     time.Time `ssm:"/text_unmarshaler/time2" default:"2020-04-14T21:26:00+02:00"`
 			Invalid string
 		}
 
@@ -83,8 +69,8 @@ func TestProvider_Process(t *testing.T) {
 						Value: aws.String("42.42"),
 					},
 					{
-						Name:  aws.String("/base/hex/hex1"),
-						Value: aws.String("737472696e6731"),
+						Name:  aws.String("/base/text_unmarshaler/time1"),
+						Value: aws.String("2020-04-14T21:26:00+02:00"),
 					},
 				},
 			},
@@ -115,8 +101,8 @@ func TestProvider_Process(t *testing.T) {
 			"/base/float32/f322",
 			"/base/float64/f641",
 			"/base/float64/f642",
-			"/base/hex/hex1",
-			"/base/hex/hex2",
+			"/base/text_unmarshaler/time1",
+			"/base/text_unmarshaler/time2",
 		}
 
 		if !reflect.DeepEqual(names, expectedNames) {
@@ -153,11 +139,12 @@ func TestProvider_Process(t *testing.T) {
 		if s.F642 != 42.42 {
 			t.Errorf("Process() F642 unexpected value: want %f, have %f", 42.42, s.F642)
 		}
-		if s.H1.V != "string1" {
-			t.Errorf("Process() H1 unexpected value: want %s, have %s", "string1", s.H1.V)
+		tm, _ := time.Parse(time.RFC3339, "2020-04-14T21:26:00+02:00")
+		if !s.TU1.Equal(tm) {
+			t.Errorf("Process() TU1 unexpected value: want %v, have %v", tm, s.TU1)
 		}
-		if s.H2.V != "string1" {
-			t.Errorf("Process() H2 unexpected value: want %s, have %s", "string1", s.H2.V)
+		if !s.TU2.Equal(tm) {
+			t.Errorf("Process() TU2 unexpected value: want %v, have %v", tm, s.TU2)
 		}
 		if s.Invalid != "" {
 			t.Errorf("Process() Missing unexpected value: want %q, have %q", "", s.Invalid)
@@ -204,6 +191,15 @@ func TestProvider_Process(t *testing.T) {
 			configPath: "/base/",
 			c: &struct {
 				B1 bool `ssm:"/bool/b1" default:"notABool"`
+			}{},
+			client:    &mockSSMClient{},
+			shouldErr: true,
+		},
+		{
+			name:       "invalid unmarshal text",
+			configPath: "/base/",
+			c: &struct {
+				B1 bool `ssm:"/text_unmarshaler/time1" default:"notATime"`
 			}{},
 			client:    &mockSSMClient{},
 			shouldErr: true,
