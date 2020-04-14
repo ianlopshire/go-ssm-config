@@ -34,6 +34,10 @@ type Provider struct {
 	SSM ssmiface.SSMAPI
 }
 
+const unmarshalTextMethod = "UnmarshalText"
+
+var textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
+
 // Process loads config values from smm (parameter store) into c. Encrypted parameters
 // will automatically be decrypted. c must be a pointer to a struct.
 //
@@ -139,23 +143,25 @@ func (p *Provider) getParameters(spec structSpec) (params map[string]string, inv
 }
 
 func isTextUnmarshaler(f reflect.StructField) bool {
-	tu := reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
-	return reflect.PtrTo(f.Type).Implements(tu)
+	return reflect.PtrTo(f.Type).Implements(textUnmarshalerType)
 }
 
+// Create a new instance of the field's type and call its UnmarshalText([]byte) method.
+// Set the value after execution and fail if the method returns an error.
 func unmarshalText(f reflect.StructField, v reflect.Value, s string) error {
 	newV := reflect.New(f.Type)
+	method := newV.MethodByName(unmarshalTextMethod)
 
-	m := newV.MethodByName("UnmarshalText")
 	args := []reflect.Value{reflect.ValueOf([]byte(s))}
-	res := m.Call(args)
-
-	if len(res) != 1 || !res[0].IsNil() {
-		err := res[0].Elem().Interface().(error)
-		return errors.Errorf("could not decode %q into type %v: %v", s, f.Type.String(), err)
-	}
+	values := method.Call(args)
 
 	v.Set(newV.Elem())
+
+	// implementation only returns an error value
+	if !values[0].IsNil() {
+		err := values[0].Elem().Interface().(error)
+		return errors.Errorf("could not decode %q into type %v: %v", s, f.Type.String(), err)
+	}
 
 	return nil
 }
