@@ -90,16 +90,16 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 			continue
 		}
 
-		field := v.Field(i)
-		structField := t.Field(i)
+		valueField := v.Field(i)
+		typeField := t.Field(i)
 		var err error
-		if isTextUnmarshaler(structField) {
-			err = unmarshalText(structField, field, value)
+		if isTextUnmarshaler(typeField) {
+			err = unmarshalText(typeField, valueField, value)
 		} else {
-			err = setValue(field, value)
+			err = setValue(valueField, value)
 		}
 		if err != nil {
-			return errors.Wrapf(err, "ssmconfig: error setting field %s", v.Type().Field(i).Name)
+			return errors.Wrapf(err, "ssmconfig: error setting field %s", typeField.Name)
 		}
 	}
 
