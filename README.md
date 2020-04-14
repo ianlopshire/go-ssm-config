@@ -14,13 +14,14 @@ AWS Lambda functions. It should be suitable for additional applications.
 
 Set some parameters in [AWS Parameter Store](https://docs.aws.amazon.com/systems-manager/latest/userguide/systems-manager-parameter-store.html):
 
-| Name                         | Value                | Type         | Key ID        |
-| ---------------------------- | -------------------- | ------------ | ------------- |
-| /exmaple_service/prod/debug  | false                | String       | -             |
-| /exmaple_service/prod/port   | 8080                 | String       | -             |
-| /exmaple_service/prod/user   | Ian                  | String       | -             |
-| /exmaple_service/prod/rate   | 0.5                  | String       | -             |
-| /exmaple_service/prod/secret | zOcZkAGB6aEjN7SAoVBT | SecureString | alias/aws/ssm |
+| Name                         | Value                     | Type         | Key ID        |
+| ---------------------------- | --------------------      | ------------ | ------------- |
+| /exmaple_service/prod/debug  | false                     | String       | -             |
+| /exmaple_service/prod/port   | 8080                      | String       | -             |
+| /exmaple_service/prod/user   | Ian                       | String       | -             |
+| /exmaple_service/prod/rate   | 0.5                       | String       | -             |
+| /exmaple_service/prod/secret | zOcZkAGB6aEjN7SAoVBT      | SecureString | alias/aws/ssm |
+| /exmaple_service/prod/ts     | 2020-04-14T21:26:00+02:00 | String       | -             |
         
 Write some code:
 
@@ -36,11 +37,12 @@ import (
 )
 
 type Config struct {
-    Debug  bool    `smm:"debug" default:"true"`
-    Port   int     `smm:"port"`
-    User   string  `smm:"user"`
-    Rate   float32 `smm:"rate"`
-    Secret string  `smm:"secret" required:"true"`
+    Debug  bool          `smm:"debug" default:"true"`
+    Port   int           `smm:"port"`
+    User   string        `smm:"user"`
+    Rate   float32       `smm:"rate"`
+    Secret string        `smm:"secret" required:"true"`
+    Timestamp time.Time  `smm:"ts" required:"true"`
 }
 
 func main() {
@@ -50,8 +52,8 @@ func main() {
         log.Fatal(err.Error())
     }
     
-    format := "Debug: %v\nPort: %d\nUser: %s\nRate: %f\nSecret: %s\n"
-    _, err = fmt.Printf(format, c.Debug, c.Port, c.User, c.Rate, c.Secret)
+    format := "Debug: %v\nPort: %d\nUser: %s\nRate: %f\nSecret: %s\nTimestamp: %s\n"
+    _, err = fmt.Printf(format, c.Debug, c.Port, c.User, c.Rate, c.Secret, c.Timestamp)
     if err != nil {
         log.Fatal(err.Error())
     }
@@ -66,6 +68,7 @@ Port: 8080
 User: Ian
 Rate: 0.500000
 Secret: zOcZkAGB6aEjN7SAoVBT
+Timestamp: 2020-04-14 21:26:00 +0200 +0200
 ```
 
 [Additional examples](https://godoc.org/github.com/ianlopshire/go-ssm-config#pkg-examples) can be found in godoc.
@@ -101,6 +104,7 @@ ssmconfig supports these struct field types:
 * int, int8, int16, int32, int64
 * bool
 * float32, float64
+* encoding.TextUnmarshaler
 
 More supported types may be added in the future.
 
