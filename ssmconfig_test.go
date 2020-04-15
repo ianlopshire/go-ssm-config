@@ -2,6 +2,7 @@ package ssmconfig_test
 
 import (
 	"errors"
+	"net"
 	"reflect"
 	"testing"
 	"time"
@@ -42,6 +43,8 @@ func TestProvider_Process(t *testing.T) {
 			F642    float64   `ssm:"/float64/f642" default:"42.42"`
 			TU1     time.Time `ssm:"/text_unmarshaler/time1"`
 			TU2     time.Time `ssm:"/text_unmarshaler/time2" default:"2020-04-14T21:26:00+02:00"`
+			TU3     net.IP    `ssm:"/text_unmarshaler/ipv41"`
+			TU4     net.IP    `ssm:"/text_unmarshaler/ipv42" default:"127.0.0.1"`
 			Invalid string
 		}
 
@@ -71,6 +74,10 @@ func TestProvider_Process(t *testing.T) {
 					{
 						Name:  aws.String("/base/text_unmarshaler/time1"),
 						Value: aws.String("2020-04-14T21:26:00+02:00"),
+					},
+					{
+						Name:  aws.String("/base/text_unmarshaler/ipv41"),
+						Value: aws.String("127.0.0.1"),
 					},
 				},
 			},
@@ -103,6 +110,8 @@ func TestProvider_Process(t *testing.T) {
 			"/base/float64/f642",
 			"/base/text_unmarshaler/time1",
 			"/base/text_unmarshaler/time2",
+			"/base/text_unmarshaler/ipv41",
+			"/base/text_unmarshaler/ipv42",
 		}
 
 		if !reflect.DeepEqual(names, expectedNames) {
@@ -145,6 +154,13 @@ func TestProvider_Process(t *testing.T) {
 		}
 		if !s.TU2.Equal(tm) {
 			t.Errorf("Process() TU2 unexpected value: want %v, have %v", tm, s.TU2)
+		}
+		ip := net.ParseIP("127.0.0.1")
+		if !s.TU3.Equal(ip) {
+			t.Errorf("Process() TU1 unexpected value: want %v, have %v", ip, s.TU3)
+		}
+		if !s.TU4.Equal(ip) {
+			t.Errorf("Process() TU2 unexpected value: want %v, have %v", ip, s.TU4)
 		}
 		if s.Invalid != "" {
 			t.Errorf("Process() Missing unexpected value: want %q, have %q", "", s.Invalid)
@@ -199,7 +215,16 @@ func TestProvider_Process(t *testing.T) {
 			name:       "invalid unmarshal text",
 			configPath: "/base/",
 			c: &struct {
-				B1 bool `ssm:"/text_unmarshaler/time1" default:"notATime"`
+				TU1 bool `ssm:"/text_unmarshaler/time1" default:"notATime"`
+			}{},
+			client:    &mockSSMClient{},
+			shouldErr: true,
+		},
+		{
+			name:       "invalid unmarshal text",
+			configPath: "/base/",
+			c: &struct {
+				TU3 bool `ssm:"/text_unmarshaler/ipv41" default:"notAnIP"`
 			}{},
 			client:    &mockSSMClient{},
 			shouldErr: true,
