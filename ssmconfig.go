@@ -91,15 +91,8 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 		}
 
 		valueField := v.Field(i)
-		typeField := t.Field(i)
-		var err error
-		if isTextUnmarshaler(typeField) {
-			err = unmarshalText(typeField, valueField, value)
-		} else {
-			err = setValue(valueField, value)
-		}
-		if err != nil {
-			return errors.Wrapf(err, "ssmconfig: error setting field %s", typeField.Name)
+		if err = setValue(valueField, value); err != nil {
+			return errors.Wrapf(err, "ssmconfig: error setting field %s", v.Type().Name())
 		}
 	}
 
@@ -143,31 +136,26 @@ func (p *Provider) getParameters(spec structSpec) (params map[string]string, inv
 }
 
 // Checks whether the value implements the TextUnmarshaler interface.
-func isTextUnmarshaler(f reflect.StructField) bool {
-	return reflect.PtrTo(f.Type).Implements(textUnmarshalerType)
+func isTextUnmarshaler(t reflect.Type) bool {
+	return reflect.PtrTo(t).Implements(textUnmarshalerType)
 }
 
 // Create a new instance of the field's type and call its UnmarshalText([]byte) method.
 // Set the value after execution and fail if the method returns an error.
-func unmarshalText(f reflect.StructField, v reflect.Value, s string) error {
-	newV := reflect.New(f.Type)
-	method := newV.MethodByName(unmarshalTextMethod)
-
-	args := []reflect.Value{reflect.ValueOf([]byte(s))}
-	values := method.Call(args)
-
-	v.Set(newV.Elem())
-
-	// implementation only returns an error value
-	if !values[0].IsNil() {
-		err := values[0].Elem().Interface().(error)
-		return errors.Errorf("could not decode %q into type %v: %v", s, f.Type.String(), err)
+func unmarshalText(t reflect.Type, v reflect.Value, s string) error {
+	err := v.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(s))
+	if err != nil {
+		return errors.Errorf("could not decode %q into type %v: %v", s, t.String(), err)
 	}
 
 	return nil
 }
 
 func setValue(v reflect.Value, s string) error {
+	t := v.Type()
+	if isTextUnmarshaler(t) {
+		return unmarshalText(t, v.Addr(), s)
+	}
 	switch v.Kind() {
 	case reflect.String:
 		v.SetString(s)

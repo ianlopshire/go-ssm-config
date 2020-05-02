@@ -215,7 +215,7 @@ func TestProvider_Process(t *testing.T) {
 			name:       "invalid unmarshal text",
 			configPath: "/base/",
 			c: &struct {
-				TU1 bool `ssm:"/text_unmarshaler/time1" default:"notATime"`
+				TU1 time.Time `ssm:"/text_unmarshaler/time1" default:"notATime"`
 			}{},
 			client:    &mockSSMClient{},
 			shouldErr: true,
@@ -224,7 +224,7 @@ func TestProvider_Process(t *testing.T) {
 			name:       "invalid unmarshal text",
 			configPath: "/base/",
 			c: &struct {
-				TU3 bool `ssm:"/text_unmarshaler/ipv41" default:"notAnIP"`
+				TU3 net.IP `ssm:"/text_unmarshaler/ipv41" default:"notAnIP"`
 			}{},
 			client:    &mockSSMClient{},
 			shouldErr: true,
