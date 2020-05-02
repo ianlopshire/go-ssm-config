@@ -34,8 +34,6 @@ type Provider struct {
 	SSM ssmiface.SSMAPI
 }
 
-const unmarshalTextMethod = "UnmarshalText"
-
 var textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
 
 // Process loads config values from smm (parameter store) into c. Encrypted parameters
