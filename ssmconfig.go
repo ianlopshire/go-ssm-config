@@ -64,8 +64,7 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 		return errors.New("ssmconfig: c must be a pointer to a struct")
 	}
 
-	t := v.Type()
-	spec := buildStructSpec(configPath, t)
+	spec := buildStructSpec(configPath, v.Type())
 
 	params, invalidPrams, err := p.getParameters(spec)
 	if err != nil {
@@ -90,9 +89,9 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 			continue
 		}
 
-		valueField := v.Field(i)
-		if err = setValue(valueField, value); err != nil {
-			return errors.Wrapf(err, "ssmconfig: error setting field %s", v.Type().Name())
+		err = setValue(v.Field(i), value)
+		if err != nil {
+			return errors.Wrapf(err, "ssmconfig: error setting field %s", v.Type().Field(i).Name)
 		}
 	}
 
