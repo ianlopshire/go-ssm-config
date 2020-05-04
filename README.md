@@ -16,12 +16,12 @@ Set some parameters in [AWS Parameter Store](https://docs.aws.amazon.com/systems
 
 | Name                         | Value                     | Type         | Key ID        |
 | ---------------------------- | --------------------      | ------------ | ------------- |
-| /exmaple_service/prod/debug  | false                     | String       | -             |
-| /exmaple_service/prod/port   | 8080                      | String       | -             |
-| /exmaple_service/prod/user   | Ian                       | String       | -             |
-| /exmaple_service/prod/rate   | 0.5                       | String       | -             |
-| /exmaple_service/prod/secret | zOcZkAGB6aEjN7SAoVBT      | SecureString | alias/aws/ssm |
-| /exmaple_service/prod/ts     | 2020-04-14T21:26:00+02:00 | String       | -             |
+| /example_service/prod/debug  | false                     | String       | -             |
+| /example_service/prod/port   | 8080                      | String       | -             |
+| /example_service/prod/user   | Ian                       | String       | -             |
+| /example_service/prod/rate   | 0.5                       | String       | -             |
+| /example_service/prod/secret | zOcZkAGB6aEjN7SAoVBT      | SecureString | alias/aws/ssm |
+| /example_service/prod/ts     | 2020-04-14T21:26:00+02:00 | String       | -             |
         
 Write some code:
 
@@ -37,12 +37,13 @@ import (
 )
 
 type Config struct {
-    Debug  bool          `smm:"debug" default:"true"`
-    Port   int           `smm:"port"`
-    User   string        `smm:"user"`
-    Rate   float32       `smm:"rate"`
-    Secret string        `smm:"secret" required:"true"`
-    Timestamp time.Time  `smm:"ts" required:"true"`
+    Debug     bool       `smm:"debug" default:"true"`
+    Port      int        `smm:"port"`
+    User      string     `smm:"user"`
+    Rate      float32    `smm:"rate"`
+    Secret    string     `smm:"secret" required:"true"`
+    Timestamp time.Time  `smm:"ts"`
+    AltIp     *net.IP    `smm:"alt_ip"`
 }
 
 func main() {
@@ -52,8 +53,8 @@ func main() {
         log.Fatal(err.Error())
     }
     
-    format := "Debug: %v\nPort: %d\nUser: %s\nRate: %f\nSecret: %s\nTimestamp: %s\n"
-    _, err = fmt.Printf(format, c.Debug, c.Port, c.User, c.Rate, c.Secret, c.Timestamp)
+    format := "Debug: %v\nPort: %d\nUser: %s\nRate: %f\nSecret: %s\nTimestamp: %s\nAltIp: %v\n"
+    _, err = fmt.Printf(format, c.Debug, c.Port, c.User, c.Rate, c.Secret, c.Timestamp, c.AltIp)
     if err != nil {
         log.Fatal(err.Error())
     }
@@ -69,6 +70,7 @@ User: Ian
 Rate: 0.500000
 Secret: zOcZkAGB6aEjN7SAoVBT
 Timestamp: 2020-04-14 21:26:00 +0200 +0200
+AltIp: <nil>
 ```
 
 [Additional examples](https://godoc.org/github.com/ianlopshire/go-ssm-config#pkg-examples) can be found in godoc.
@@ -106,7 +108,7 @@ ssmconfig supports these struct field types:
 * float32, float64
 * encoding.TextUnmarshaler
 
-More supported types may be added in the future.
+More supported types may be added in the future. Field types that implement the `encoding.TextUnmarshaler` interface can be used directly or as a pointer.
 
 ## Licence
 
