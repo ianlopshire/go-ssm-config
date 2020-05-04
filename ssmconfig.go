@@ -132,14 +132,12 @@ func (p *Provider) getParameters(spec structSpec) (params map[string]string, inv
 	return params, invalidParams, nil
 }
 
-// Checks whether the value implements the TextUnmarshaler interface.
-func isTextUnmarshaler(t reflect.Type) bool {
-	return reflect.PtrTo(t).Implements(textUnmarshalerType)
-}
-
 // Create a new instance of the field's type and call its UnmarshalText([]byte) method.
 // Set the value after execution and fail if the method returns an error.
 func unmarshalText(t reflect.Type, v reflect.Value, s string) error {
+	if v.IsNil() {
+		v.Set(reflect.New(t.Elem()))
+	}
 	err := v.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(s))
 	if err != nil {
 		return errors.Errorf("could not decode %q into type %v: %v", s, t.String(), err)
@@ -150,7 +148,9 @@ func unmarshalText(t reflect.Type, v reflect.Value, s string) error {
 
 func setValue(v reflect.Value, s string) error {
 	t := v.Type()
-	if isTextUnmarshaler(t) {
+	if t.Implements(textUnmarshalerType) {
+		return unmarshalText(t, v, s)
+	} else if reflect.PtrTo(t).Implements(textUnmarshalerType) {
 		return unmarshalText(t, v.Addr(), s)
 	}
 	switch v.Kind() {
