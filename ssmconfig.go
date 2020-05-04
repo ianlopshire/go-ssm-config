@@ -3,6 +3,7 @@
 package ssmconfig
 
 import (
+	"encoding"
 	"path"
 	"reflect"
 	"strconv"
@@ -32,6 +33,8 @@ func Process(configPath string, c interface{}) error {
 type Provider struct {
 	SSM ssmiface.SSMAPI
 }
+
+var textUnmarshalerType = reflect.TypeOf((*encoding.TextUnmarshaler)(nil)).Elem()
 
 // Process loads config values from smm (parameter store) into c. Encrypted parameters
 // will automatically be decrypted. c must be a pointer to a struct.
@@ -129,7 +132,27 @@ func (p *Provider) getParameters(spec structSpec) (params map[string]string, inv
 	return params, invalidParams, nil
 }
 
+// Create a new instance of the field's type and call its UnmarshalText([]byte) method.
+// Set the value after execution and fail if the method returns an error.
+func unmarshalText(t reflect.Type, v reflect.Value, s string) error {
+	if v.IsNil() {
+		v.Set(reflect.New(t.Elem()))
+	}
+	err := v.Interface().(encoding.TextUnmarshaler).UnmarshalText([]byte(s))
+	if err != nil {
+		return errors.Errorf("could not decode %q into type %v: %v", s, t.String(), err)
+	}
+
+	return nil
+}
+
 func setValue(v reflect.Value, s string) error {
+	t := v.Type()
+	if t.Implements(textUnmarshalerType) {
+		return unmarshalText(t, v, s)
+	} else if reflect.PtrTo(t).Implements(textUnmarshalerType) {
+		return unmarshalText(t, v.Addr(), s)
+	}
 	switch v.Kind() {
 	case reflect.String:
 		v.SetString(s)
