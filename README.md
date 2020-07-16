@@ -36,11 +36,11 @@ import (
 )
 
 type Config struct {
-    Debug  bool    `smm:"debug" default:"true"`
-    Port   int     `smm:"port"`
-    User   string  `smm:"user"`
-    Rate   float32 `smm:"rate"`
-    Secret string  `smm:"secret" required:"true"`
+    Debug  bool    `ssm:"debug" default:"true"`
+    Port   int     `ssm:"port"`
+    User   string  `ssm:"user"`
+    Rate   float32 `ssm:"rate"`
+    Secret string  `ssm:"secret" required:"true"`
 }
 
 func main() {
