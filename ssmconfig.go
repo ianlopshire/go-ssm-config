@@ -69,36 +69,6 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 	return setValues(v, params, invalidPrams, spec)
 }
 
-type fieldSpec struct {
-	name         string
-	defaultValue string
-	required     bool
-}
-
-func buildStructSpec(configPath string, t reflect.Type, spec map[string]fieldSpec) {
-	for i := 0; i < t.NumField(); i++ {
-		// Add support for struct pointers
-		ft := t.Field(i).Type
-		if ft.Kind() == reflect.Ptr {
-			ft = ft.Elem()
-		}
-
-		if ft.Kind() == reflect.Struct {
-			buildStructSpec(configPath, ft, spec)
-			continue
-		}
-		name := t.Field(i).Tag.Get("ssm")
-		if name == "" {
-			continue
-		}
-		spec[name] = fieldSpec{
-			name:         path.Join(configPath, name),
-			defaultValue: t.Field(i).Tag.Get("default"),
-			required:     t.Field(i).Tag.Get("required") == "true",
-		}
-	}
-}
-
 func (p *Provider) getParameters(spec map[string]fieldSpec) (params map[string]string, invalidParams map[string]struct{}, err error) {
 	// find all of the params that need to be requested
 	var names []*string
@@ -214,4 +184,34 @@ func setBasicValue(v reflect.Value, s string) error {
 	}
 
 	return nil
+}
+
+type fieldSpec struct {
+	name         string
+	defaultValue string
+	required     bool
+}
+
+func buildStructSpec(configPath string, t reflect.Type, spec map[string]fieldSpec) {
+	for i := 0; i < t.NumField(); i++ {
+		// Add support for struct pointers
+		ft := t.Field(i).Type
+		if ft.Kind() == reflect.Ptr {
+			ft = ft.Elem()
+		}
+
+		if ft.Kind() == reflect.Struct {
+			buildStructSpec(configPath, ft, spec)
+			continue
+		}
+		name := t.Field(i).Tag.Get("ssm")
+		if name == "" {
+			continue
+		}
+		spec[name] = fieldSpec{
+			name:         path.Join(configPath, name),
+			defaultValue: t.Field(i).Tag.Get("default"),
+			required:     t.Field(i).Tag.Get("required") == "true",
+		}
+	}
 }
