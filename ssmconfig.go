@@ -129,7 +129,7 @@ func setValues(v reflect.Value, params map[string]string, invalidParams map[stri
 		}
 		field := spec[name]
 		if _, ok := invalidParams[field.name]; ok && field.required {
-			return errors.Errorf("ssmconfig: %s is required", invalidParams[field.name])
+			return errors.Errorf("ssmconfig: %s is required", field.name)
 		}
 
 		value, ok := params[field.name]
