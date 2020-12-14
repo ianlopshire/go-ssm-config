@@ -30,9 +30,12 @@ func TestProvider_Process(t *testing.T) {
 	t.Run("base case", func(t *testing.T) {
 		type d struct {
 			D1 string `ssm:"/strings/d1"`
-			D2 struct{
+			D2 struct {
 				D3 string `ssm:"/strings/d2"`
 			}
+		}
+		type e struct {
+			E1 string `ssm:"/strings/e1"`
 		}
 		var s struct {
 			S1      string  `ssm:"/strings/s1"`
@@ -47,6 +50,8 @@ func TestProvider_Process(t *testing.T) {
 			F642    float64 `ssm:"/float64/f642" default:"42.42"`
 			Invalid string
 			D       d
+			DPntr   *d
+			e
 		}
 
 		mc := &mockSSMClient{
@@ -80,6 +85,10 @@ func TestProvider_Process(t *testing.T) {
 						Name:  aws.String("/base/strings/d2"),
 						Value: aws.String("string4"),
 					},
+					{
+						Name:  aws.String("/base/strings/e1"),
+						Value: aws.String("string5"),
+					},
 				},
 			},
 		}
@@ -87,6 +96,9 @@ func TestProvider_Process(t *testing.T) {
 		p := &ssmconfig.Provider{
 			SSM: mc,
 		}
+
+		// Add Pointer Struct
+		s.DPntr = &d{}
 
 		err := p.Process("/base/", &s)
 
@@ -111,9 +123,10 @@ func TestProvider_Process(t *testing.T) {
 			"/base/float64/f641",
 			"/base/string/d1",
 			"/base/string/d2",
+			"/base/string/e1",
 		}
 
-		if len(names) !=  len(expectedNames) {
+		if len(names) != len(expectedNames) {
 			t.Errorf("Process() unexpected input names: have %v, want %v", names, expectedNames)
 		}
 
@@ -155,6 +168,15 @@ func TestProvider_Process(t *testing.T) {
 		}
 		if s.D.D2.D3 != "string4" {
 			t.Errorf("Process() D2 unexpected value: want %s, have %s", "string4", s.D.D2.D3)
+		}
+		if s.DPntr.D1 != "string3" {
+			t.Errorf("Process() D1 unexpected value: want %s, have %s", "string3", s.DPntr.D1)
+		}
+		if s.DPntr.D2.D3 != "string4" {
+			t.Errorf("Process() D2 unexpected value: want %s, have %s", "string4", s.DPntr.D2.D3)
+		}
+		if s.E1 != "string5" {
+			t.Errorf("Process() D2 unexpected value: want %s, have %s", "string5", s.E1)
 		}
 	})
 

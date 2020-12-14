@@ -6,23 +6,12 @@ import (
 	"path"
 	"reflect"
 	"strconv"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	"github.com/pkg/errors"
-)
-
-type (
-	Provider struct {
-		SSM ssmiface.SSMAPI
-	}
-
-	fieldSpec struct {
-		name         string
-		defaultValue string
-		required     bool
-	}
 )
 
 // Process processes the config with a new default provider.
@@ -37,6 +26,10 @@ func Process(configPath string, c interface{}) error {
 
 	p := Provider{SSM: ssm.New(sess)}
 	return p.Process(configPath, c)
+}
+
+type Provider struct {
+	SSM ssmiface.SSMAPI
 }
 
 // Process loads config values from smm (parameter store) into c. Encrypted parameters
@@ -64,7 +57,7 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 	}
 	// get params required from struct
 	spec := make(map[string]fieldSpec)
-	buildStructSpec(configPath, v.Type(), &spec)
+	buildStructSpec(configPath, v.Type(), spec)
 
 	// get params from ssm parameter store
 	params, invalidPrams, err := p.getParameters(spec)
@@ -76,18 +69,29 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 	return setValues(v, params, invalidPrams, spec)
 }
 
-func buildStructSpec(configPath string, t reflect.Type, spec *map[string]fieldSpec) {
+type fieldSpec struct {
+	name         string
+	defaultValue string
+	required     bool
+}
+
+func buildStructSpec(configPath string, t reflect.Type, spec map[string]fieldSpec) {
 	for i := 0; i < t.NumField(); i++ {
-		if t.Field(i).Type.Kind() == reflect.Struct {
-			buildStructSpec(configPath, t.Field(i).Type, spec)
+		// Add support for struct pointers
+		ft := t.Field(i).Type
+		if ft.Kind() == reflect.Ptr {
+			ft = ft.Elem()
+		}
+
+		if ft.Kind() == reflect.Struct {
+			buildStructSpec(configPath, ft, spec)
 			continue
 		}
 		name := t.Field(i).Tag.Get("ssm")
 		if name == "" {
 			continue
 		}
-		specMap := *spec
-		specMap[name] = fieldSpec{
+		spec[name] = fieldSpec{
 			name:         path.Join(configPath, name),
 			defaultValue: t.Field(i).Tag.Get("default"),
 			required:     t.Field(i).Tag.Get("required") == "true",
@@ -133,8 +137,17 @@ func (p *Provider) getParameters(spec map[string]fieldSpec) (params map[string]s
 }
 
 func setValues(v reflect.Value, params map[string]string, invalidParams map[string]struct{}, spec map[string]fieldSpec) error {
+	if v.Kind() == reflect.Ptr {
+		v = reflect.Indirect(v)
+	}
 	for i := 0; i < v.NumField(); i++ {
-		if v.Type().Field(i).Type.Kind() == reflect.Struct {
+		// Add support for struct pointers
+		ft := v.Type().Field(i).Type
+		if ft.Kind() == reflect.Ptr {
+			ft = ft.Elem()
+		}
+
+		if ft.Kind() == reflect.Struct {
 			if err := setValues(v.Field(i), params, invalidParams, spec); err != nil {
 				return err
 			}
