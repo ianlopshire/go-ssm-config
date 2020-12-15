@@ -108,8 +108,13 @@ func (p *Provider) getParameters(spec map[string]fieldSpec) (params map[string]s
 
 func setValues(v reflect.Value, params map[string]string, invalidParams map[string]struct{}, spec map[string]fieldSpec) error {
 	if v.Kind() == reflect.Ptr {
+		// Return on nil pointer
+		if v.IsNil() {
+			return nil
+		}
 		v = reflect.Indirect(v)
 	}
+
 	for i := 0; i < v.NumField(); i++ {
 		// Add support for struct pointers
 		ft := v.Type().Field(i).Type
