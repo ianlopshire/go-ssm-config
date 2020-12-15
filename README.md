@@ -7,7 +7,7 @@ package is largely inspired by [kelseyhightower/envconfig](https://github.com/ke
 
 ## Motivation
 
-This package was created to reduce the boilerplate code required when using Parameter Store to provide configuration to 
+This package was created to reduce the boilerplate code required when using Parameter Store to provide configuration to
 AWS Lambda functions. It should be suitable for additional applications.
 
 ## Usage
@@ -21,7 +21,7 @@ Set some parameters in [AWS Parameter Store](https://docs.aws.amazon.com/systems
 | /exmaple_service/prod/user   | Ian                  | String       | -             |
 | /exmaple_service/prod/rate   | 0.5                  | String       | -             |
 | /exmaple_service/prod/secret | zOcZkAGB6aEjN7SAoVBT | SecureString | alias/aws/ssm |
-        
+
 Write some code:
 
 ```go
@@ -34,13 +34,24 @@ import (
 
     ssmconfig "github.com/ianlopshire/go-ssm-config"
 )
+type DbConfig struct {
+    Host string
+	Name string
+	Pass string `ssm:"/db/password" required:"true"`
+}
+
+type LogConfig struct {
+    LogSamplingRate int `ssm:"log_sample_rate"`
+}
 
 type Config struct {
-    Debug  bool    `ssm:"debug" default:"true"`
-    Port   int     `ssm:"port"`
-    User   string  `ssm:"user"`
-    Rate   float32 `ssm:"rate"`
-    Secret string  `ssm:"secret" required:"true"`
+    Debug  bool    `smm:"debug" default:"true"`
+    Port   int     `smm:"port"`
+    User   string  `smm:"user"`
+    Rate   float32 `smm:"rate"`
+    Secret string  `smm:"secret" required:"true"`
+    DB     DbConfig
+    LogSamplingRate
 }
 
 func main() {
@@ -49,7 +60,7 @@ func main() {
     if err != nil {
         log.Fatal(err.Error())
     }
-    
+
     format := "Debug: %v\nPort: %d\nUser: %s\nRate: %f\nSecret: %s\n"
     _, err = fmt.Printf(format, c.Debug, c.Port, c.User, c.Rate, c.Secret)
     if err != nil {
@@ -97,10 +108,11 @@ The behavior of using the `default` and `required` tags on the same struct field
 
 ssmconfig supports these struct field types:
 
-* string
-* int, int8, int16, int32, int64
-* bool
-* float32, float64
+- string
+- int, int8, int16, int32, int64
+- bool
+- float32, float64
+- struct, \*struct
 
 More supported types may be added in the future.
 
