@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/service/ssm"
 	"github.com/aws/aws-sdk-go/service/ssm/ssmiface"
 	ssmconfig "github.com/ianlopshire/go-ssm-config"
@@ -13,12 +14,12 @@ import (
 
 type mockSSMClient struct {
 	ssmiface.SSMAPI
-	calledWithInput *ssm.GetParametersInput
-	output          *ssm.GetParametersOutput
+	calledWithInput *ssm.GetParametersByPathInput
+	output          *ssm.GetParametersByPathOutput
 	err             error
 }
 
-func (c *mockSSMClient) GetParameters(input *ssm.GetParametersInput) (*ssm.GetParametersOutput, error) {
+func (c *mockSSMClient) GetParametersByPathWithContext(ctx aws.Context, input *ssm.GetParametersByPathInput, opt ...request.Option) (*ssm.GetParametersByPathOutput, error) {
 	c.calledWithInput = input
 	if c.err != nil {
 		return nil, c.err
@@ -43,7 +44,7 @@ func TestProvider_Process(t *testing.T) {
 		}
 
 		mc := &mockSSMClient{
-			output: &ssm.GetParametersOutput{
+			output: &ssm.GetParametersByPathOutput{
 				Parameters: []*ssm.Parameter{
 					{
 						Name:  aws.String("/base/strings/s1"),
@@ -79,26 +80,26 @@ func TestProvider_Process(t *testing.T) {
 			t.Errorf("Process() unexpected error: %q", err.Error())
 		}
 
-		names := make([]string, len(mc.calledWithInput.Names))
-		for i := range mc.calledWithInput.Names {
-			names[i] = *mc.calledWithInput.Names[i]
-		}
-		expectedNames := []string{
-			"/base/strings/s1",
-			"/base/strings/s2",
-			"/base/int/i1",
-			"/base/int/i2",
-			"/base/bool/b1",
-			"/base/bool/b2",
-			"/base/float32/f321",
-			"/base/float32/f322",
-			"/base/float64/f641",
-			"/base/float64/f642",
-		}
+		// names := make([]string, len(mc.calledWithInput.Names))
+		// for i := range mc.calledWithInput.Names {
+		// 	names[i] = *mc.calledWithInput.Names[i]
+		// }
+		// expectedNames := []string{
+		// 	"/base/strings/s1",
+		// 	"/base/strings/s2",
+		// 	"/base/int/i1",
+		// 	"/base/int/i2",
+		// 	"/base/bool/b1",
+		// 	"/base/bool/b2",
+		// 	"/base/float32/f321",
+		// 	"/base/float32/f322",
+		// 	"/base/float64/f641",
+		// 	"/base/float64/f642",
+		// }
 
-		if !reflect.DeepEqual(names, expectedNames) {
-			t.Errorf("Process() unexpected input names: have %v, want %v", names, expectedNames)
-		}
+		// if !reflect.DeepEqual(names, expectedNames) {
+		// 	t.Errorf("Process() unexpected input names: have %v, want %v", names, expectedNames)
+		// }
 
 		if s.S1 != "string1" {
 			t.Errorf("Process() S1 unexpected value: want %q, have %q", "string1", s.S1)
@@ -186,9 +187,7 @@ func TestProvider_Process(t *testing.T) {
 				S1 string `ssm:"/strings/s1" required:"true"`
 			}{},
 			client: &mockSSMClient{
-				output: &ssm.GetParametersOutput{
-					InvalidParameters: []*string{aws.String("/base/strings/s1")},
-				},
+				output: &ssm.GetParametersByPathOutput{},
 			},
 			shouldErr: true,
 		},
@@ -199,7 +198,7 @@ func TestProvider_Process(t *testing.T) {
 				M1 map[string]string `ssm:"/map/m1"`
 			}{},
 			client: &mockSSMClient{
-				output: &ssm.GetParametersOutput{
+				output: &ssm.GetParametersByPathOutput{
 					Parameters: []*ssm.Parameter{{
 						Name:  aws.String("/base/map/m1"),
 						Value: aws.String("notSupported"),
@@ -218,7 +217,7 @@ func TestProvider_Process(t *testing.T) {
 				S1 string `ssm:"/strings/s1"`
 			}{},
 			client: &mockSSMClient{
-				output: &ssm.GetParametersOutput{
+				output: &ssm.GetParametersByPathOutput{
 					Parameters: []*ssm.Parameter{{
 						Name:  aws.String("/strings/s1"),
 						Value: aws.String(""),

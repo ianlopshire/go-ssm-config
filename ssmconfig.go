@@ -3,7 +3,7 @@
 package ssmconfig
 
 import (
-	"path"
+	"context"
 	"reflect"
 	"strconv"
 
@@ -48,7 +48,10 @@ type Provider struct {
 // The behavior of using the `default` and `required` tags on the same struct field is
 // currently undefined.
 func (p *Provider) Process(configPath string, c interface{}) error {
+	return p.ProcessCtx(context.TODO(), configPath, c)
+}
 
+func (p *Provider) ProcessCtx(ctx context.Context, configPath string, c interface{}) error {
 	v := reflect.ValueOf(c)
 	if v.Kind() != reflect.Ptr || v.IsNil() {
 		return errors.New("ssmconfig: c must be a pointer to a struct")
@@ -59,38 +62,41 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 		return errors.New("ssmconfig: c must be a pointer to a struct")
 	}
 
-	spec := buildStructSpec(configPath, v.Type())
-
-	params, invalidPrams, err := p.getParameters(spec)
+	params, err := p.getParametersByPath(ctx, configPath)
 	if err != nil {
 		return errors.Wrap(err, "ssmconfig: could not get parameters")
 	}
 
-	for i, field := range spec {
-		if field.name == "" && field.defaultValue == "" {
-			continue
-		}
-
-		if _, ok := invalidPrams[field.name]; ok && field.required {
-			return errors.Errorf("ssmconfig: %s is required", field.name)
-		}
-
-		value, ok := params[field.name]
-		if !ok {
-			value = field.defaultValue
-		}
-
-		if value == "" {
-			continue
-		}
-
-		err = setValue(v.Field(i), value)
-		if err != nil {
-			return errors.Wrapf(err, "ssmconfig: error setting field %s", v.Type().Field(i).Name)
-		}
+	vs := newValueSetter(v.Type())
+	if err := vs(v, configPath, params); err != nil {
+		return err
 	}
 
 	return nil
+}
+
+func (p *Provider) getParametersByPath(ctx context.Context, path string) (params Values, err error) {
+	input := &ssm.GetParametersByPathInput{
+		Path:           aws.String(path),
+		Recursive:      aws.Bool(true),
+		WithDecryption: aws.Bool(true),
+	}
+
+	output, err := p.SSM.GetParametersByPathWithContext(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	if output == nil {
+		return Values{}, nil
+	}
+
+	params = map[string]string{}
+	for i := range output.Parameters {
+		params[*output.Parameters[i].Name] = *output.Parameters[i].Value
+	}
+
+	// TODO: Add pagination
+	return params, nil
 }
 
 func (p *Provider) getParameters(spec structSpec) (params map[string]string, invalidParams map[string]struct{}, err error) {
@@ -166,28 +172,4 @@ func setValue(v reflect.Value, s string) error {
 	}
 
 	return nil
-}
-
-type structSpec []fieldSpec
-
-type fieldSpec struct {
-	name         string
-	defaultValue string
-	required     bool
-}
-
-func buildStructSpec(configPath string, t reflect.Type) (spec structSpec) {
-	for i := 0; i < t.NumField(); i++ {
-		name := t.Field(i).Tag.Get("ssm")
-		if name != "" {
-			name = path.Join(configPath, name)
-		}
-
-		spec = append(spec, fieldSpec{
-			name:         name,
-			defaultValue: t.Field(i).Tag.Get("default"),
-			required:     t.Field(i).Tag.Get("required") == "true",
-		})
-	}
-	return spec
 }
