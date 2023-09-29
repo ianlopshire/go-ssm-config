@@ -67,7 +67,7 @@ func (p *Provider) Process(configPath string, c interface{}) error {
 	}
 
 	for i, field := range spec {
-		if field.name == "" && field.defaultValue == "" {
+		if field.name == "" {
 			continue
 		}
 
