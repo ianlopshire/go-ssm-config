@@ -39,8 +39,10 @@ func TestProvider_Process(t *testing.T) {
 			F322    float32 `ssm:"/float32/f322" default:"42.42"`
 			F641    float64 `ssm:"/float64/f641"`
 			F642    float64 `ssm:"/float64/f642" default:"42.42"`
+			NoSSM   string  `default:"ignored"`
 			Invalid string
 		}
+		s.NoSSM = "pre"
 
 		mc := &mockSSMClient{
 			output: &ssm.GetParametersOutput{
@@ -129,6 +131,9 @@ func TestProvider_Process(t *testing.T) {
 		}
 		if s.F642 != 42.42 {
 			t.Errorf("Process() F642 unexpected value: want %f, have %f", 42.42, s.F642)
+		}
+		if s.NoSSM != "pre" {
+			t.Errorf("Process() NoSSM unexpected value: want %q, have %q", "pre", s.NoSSM)
 		}
 		if s.Invalid != "" {
 			t.Errorf("Process() Missing unexpected value: want %q, have %q", "", s.Invalid)
